@@ -11,11 +11,19 @@
 // });
 
 import { Server } from "socket.io";
-import exporess from "express";
+import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
+
+// fix zato sto koristimo module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 3500;
 
-const app = exporess();
+const app = express();
+
+app.use(express.static(path.join(__dirname, "public")));
 
 const expressServer = app.listen(PORT, () => {
     console.log(`listening on port: ${PORT}`);
