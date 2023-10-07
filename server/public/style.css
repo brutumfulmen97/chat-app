@@ -10,6 +10,7 @@ body {
 
 form {
     display: flex;
+    flex-direction: column;
     justify-content: center;
     gap: 4px;
 }
@@ -25,4 +26,8 @@ input,
 button {
     border-radius: 10px;
     padding: 10px;
+}
+
+.activity {
+    margin-top: 3rem;
 }

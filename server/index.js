@@ -41,8 +41,32 @@ const io = new Server(expressServer, {
 io.on("connection", (socket) => {
     console.log("user " + socket.id + " connected");
 
+    //upon conn - only to user
+    socket.emit("message", "Welcome to the chatroom!");
+
+    //to all users except user
+    socket.broadcast.emit(
+        "message",
+        `${socket.id.substring(0, 5)} has joined the chat`
+    );
+
+    //listen for chat message
     socket.on("message", (data) => {
         console.log(data);
         io.emit("message", `${socket.id.substring(0, 5)}: ${data}`);
+    });
+
+    //upon disconn - to all users
+    socket.on("disconnect", () => {
+        socket.broadcast.emit(
+            "message",
+            `${socket.id.substring(0, 5)} has left the chat`
+        );
+    });
+
+    //listen for activity
+    socket.on("activity", (name) => {
+        console.log(name);
+        socket.broadcast.emit("activity", name);
     });
 });
