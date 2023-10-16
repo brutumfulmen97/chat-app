@@ -52,7 +52,7 @@ socket.on("message", (data) => {
             name === nameInput.value
                 ? "post__header--user"
                 : "post__header--reply"
-        }">
+        }" >
         <span class="post__header--name">${name}</span> 
         <span class="post__header--time">${time}</span> 
         </div>
