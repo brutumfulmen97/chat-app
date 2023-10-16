@@ -14,12 +14,15 @@ import { Server } from "socket.io";
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
+import { get } from "http";
 
 // fix zato sto koristimo module
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 3500;
+
+const ADMIN = "Admin";
 
 const app = express();
 
@@ -28,6 +31,14 @@ app.use(express.static(path.join(__dirname, "public")));
 const expressServer = app.listen(PORT, () => {
     console.log(`listening on port: ${PORT}`);
 });
+
+// state for users
+const UsersState = {
+    users: [],
+    setUsers: function (nid, name, roomewUsers) {
+        this.users = newUsers;
+    },
+};
 
 const io = new Server(expressServer, {
     cors: {
@@ -42,31 +53,126 @@ io.on("connection", (socket) => {
     console.log("user " + socket.id + " connected");
 
     //upon conn - only to user
-    socket.emit("message", "Welcome to the chatroom!");
+    socket.emit("message", buildMessage(ADMIN, "Welcome to chat app"));
 
-    //to all users except user
-    socket.broadcast.emit(
-        "message",
-        `${socket.id.substring(0, 5)} has joined the chat`
-    );
+    socket.on("enterRoom", ({ name, room }) => {
+        //leave previous room
+        const prevRoom = getUser(socket.id)?.room;
 
-    //listen for chat message
-    socket.on("message", (data) => {
-        console.log(data);
-        io.emit("message", `${socket.id.substring(0, 5)}: ${data}`);
+        if (prevRoom) {
+            socket.leave(prevRoom);
+            io.to(prevRoom).emit(
+                "message",
+                buildMessage(ADMIN, `${name} has left the room`)
+            );
+        }
+
+        const user = activateUser(socket.id, name, room);
+
+        if (prevRoom) {
+            io.to(prevRoom).emit("userList", {
+                users: getUsersInRoom(prevRoom),
+            });
+        }
+
+        socket.join(user.room);
+
+        //to user
+        socket.emit(
+            "message",
+            buildMessage(ADMIN, `You have joined the ${user.room} chat room`)
+        );
+
+        socket.broadcast
+            .to(user.room)
+            .emit(
+                "message",
+                buildMessage(ADMIN, `${user.name} has joined the chat`)
+            );
+
+        //update user list
+        io.to(user.room).emit("userList", {
+            users: getUsersInRoom(user.room),
+        });
+
+        //update room list
+        io.emit("roomList", {
+            rooms: getAllActiveRooms(),
+        });
     });
 
-    //upon disconn - to all users
+    //listen for chat message
+    socket.on("message", ({ name, text }) => {
+        const room = getUser(socket.id)?.room;
+
+        if (room) {
+            io.to(room).emit("message", buildMessage(name, text));
+        }
+    });
+
+    //upon disconnect - to all users
     socket.on("disconnect", () => {
-        socket.broadcast.emit(
-            "message",
-            `${socket.id.substring(0, 5)} has left the chat`
-        );
+        const user = getUser(socket.id);
+        userLeavesApp(socket.id);
+
+        if (user) {
+            io.to(user.room).emit(
+                "message",
+                buildMessage(ADMIN, `${user.name} has left the chat`)
+            );
+
+            io.to(user.room).emit("userList", {
+                users: getUsersInRoom(user.room),
+            });
+
+            io.emit("roomList", {
+                rooms: getAllActiveRooms(),
+            });
+
+            console.log(`user ${socket.id} disconnected`);
+        }
     });
 
     //listen for activity
     socket.on("activity", (name) => {
-        console.log(name);
-        socket.broadcast.emit("activity", name);
+        const room = getUser(socket.id)?.room;
+
+        if (room) {
+            socket.broadcast.to(room).emit("activity", name);
+        }
     });
 });
+
+function buildMessage(name, text) {
+    return {
+        name,
+        text,
+        time: new Intl.DateTimeFormat("default", {
+            hour: "numeric",
+            minute: "numeric",
+            second: "numeric",
+        }).format(new Date()),
+    };
+}
+
+function activateUser(id, name, room) {
+    const user = { id, name, room };
+    UsersState.setUsers([...UsersState.filter((u) => u.id !== id), user]);
+    return user;
+}
+
+function userLeavesApp(id) {
+    UsersState.setUsers(UsersState.filter((u) => u.id !== id));
+}
+
+function getUser(id) {
+    return UsersState.users.find((u) => u.id === id);
+}
+
+function getUsersInRoom(room) {
+    return UsersState.users.filter((u) => u.room === room);
+}
+
+function getAllActiveRooms() {
+    return Array.from(new Set(UsersState.users.map((user) => user.room)));
+}
