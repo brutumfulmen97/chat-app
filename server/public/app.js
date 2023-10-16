@@ -22,31 +22,53 @@
 
 const socket = io("http://localhost:3500");
 
+const nameInput = document.querySelector("#name");
+const roomInput = document.querySelector("#room");
+const msgInput = document.querySelector("#message");
+
 const activity = document.querySelector(".activity");
-const msgInput = document.querySelector("input");
+const usersList = document.querySelector(".user");
+const roomList = document.querySelector(".room");
+
+const chatDisplay = document.querySelector(".chat-display");
 
 function sendMessage(e) {
     e.preventDefault();
 
-    if (msgInput.value) {
-        socket.emit("message", msgInput.value);
+    if (nameInput.value && roomInput.value && msgInput.value) {
+        socket.emit("message", {
+            name: nameInput.value,
+            text: msgInput.value,
+        });
         msgInput.value = "";
     }
 
     msgInput.focus();
 }
 
-document.querySelector("form").addEventListener("submit", sendMessage);
+function enterRoom() {
+    e.preventDefault();
+
+    if (nameInput.value && roomInput.value) {
+        socket.emit("enterRoom", {
+            name: nameInput.value,
+            room: roomInput.value,
+        });
+    }
+}
+
+document.querySelector(".form-message").addEventListener("submit", sendMessage);
+document.querySelector(".form-join").addEventListener("submit", enterRoom);
+
+msgInput.addEventListener("keypress", () => {
+    socket.emit("activity", nameInput.value);
+});
 
 socket.on("message", (message) => {
     activity.textContent = "";
     const li = document.createElement("li");
     li.textContent = message;
     document.querySelector("ul").appendChild(li);
-});
-
-msgInput.addEventListener("keypress", () => {
-    socket.emit("activity", socket.id.substring(0, 5));
 });
 
 let activityTimer;
